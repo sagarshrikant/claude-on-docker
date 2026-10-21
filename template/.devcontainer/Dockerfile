@@ -1,5 +1,6 @@
-# Per-project image: the base + whatever this project needs.
-# Not needed? Delete this file and use  "image": "claude-base"  in devcontainer.json.
+# OPTIONAL per-project image: the base + tools only this project needs.
+# Only used when Option B is enabled in devcontainer.json; otherwise ignored.
+# After editing: F1 -> Dev Containers: Rebuild Container
 FROM claude-base
 
 USER root

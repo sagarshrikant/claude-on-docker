@@ -12,14 +12,14 @@ Think of a cookie cutter:
 
 - **Base image** (`claude-base`) — the cutter. Built once: Claude Code, git, ssh client, safe default settings.
 - **Containers** — the cookies. One fresh container per project; it only sees that project's folder.
-- **Child image** (`template/.devcontainer/Dockerfile`) — the cutter with an extra decoration, for projects that need extra tools (e.g. Python).
+- **Child image** (optional, `template/.devcontainer/Dockerfile`) — the cutter with an extra decoration, only for projects that need extra tools (e.g. Python, a compiler).
 - **`claude-home` volume** — your locker. Keeps your Claude login and git config, shared by all containers. Lives only on your PC.
 
 ```
 claude-base (image)
- ├── container: project-A   sees only ~/projects/A
- ├── container: project-B   sees only ~/projects/B
- └── child image (base + python)
+ ├── container: project-A   sees only ~/projects/A  at /workspace/A
+ ├── container: project-B   sees only ~/projects/B  at /workspace/B
+ └── child image (base + python)        ← only if a project needs extra tools
       └── container: project-C
 all containers mount the claude-home volume → log in once
 ```
@@ -31,7 +31,8 @@ all containers mount the claude-home volume → log in once
 | `base/Dockerfile` | Base image: Claude Code + git + ssh client, non-root user `node`, passwordless `sudo` |
 | `base/managed-settings.json` | System-wide Claude settings: ask before running commands, always ask before `git push` |
 | `claude.sh` | Run Claude in the terminal for the current folder |
-| `template/.devcontainer/` | Copy into a project to open it in VS Code inside a container |
+| `template/.devcontainer/devcontainer.json` | Copy into a project to open it in VS Code inside a container |
+| `template/.devcontainer/Dockerfile` | Optional child image for projects needing extra tools (used only when Option B is enabled) |
 
 No secrets are stored anywhere in this repo.
 
@@ -46,7 +47,8 @@ git clone https://github.com/<you>/claude-on-docker.git
 cd claude-on-docker
 docker build -t claude-base base/
 chmod +x claude.sh
-sudo ln -s "$PWD/claude.sh" /usr/local/bin/claude-docker   # optional shortcut
+sudo ln -sf "$PWD/claude.sh" /usr/local/bin/claude-docker  # makes "claude-docker" work from any folder
+hash -r                                                     # refresh the shell's command list (zsh: rehash)
 ```
 
 ## 2. Set up GitHub access (SSH agent forwarding)
@@ -66,7 +68,7 @@ ssh-add -l                              # must list only that key
 The agent forgets keys at logout/reboot, and Ubuntu may auto-load all keys again — so
 re-check `ssh-add -l` after each login.
 
-Optional helper for `~/.bashrc` — loads the right key and opens VS Code in one step:
+Optional helper for `~/.bashrc` (or `~/.zshrc` if you use zsh) — loads the right key and opens VS Code in one step:
 
 ```bash
 export GITHUB_KEY="$HOME/.ssh/<your_github_key>"
@@ -76,9 +78,12 @@ claude-code() { ssh-add -D >/dev/null 2>&1; ssh-add "$GITHUB_KEY" && code "${1:-
 ## 3. Use from the terminal
 
 ```bash
-cd ~/projects/my-app
+cd ~/projects/my-app      # always run it from INSIDE the project folder
 claude-docker
 ```
+
+`claude-docker` mounts the folder you run it from — run it in the wrong folder and Claude
+works on that folder. The header shows which one: `/workspace/my-app`.
 
 First run only: Claude shows a login URL — open it in your browser. The login is saved in
 the `claude-home` volume, so every later run (any project) is already logged in.
@@ -103,9 +108,9 @@ For longer output, ask Claude to write it to a file in the project folder and op
    cp -r ~/claude-on-docker/template/.devcontainer ~/projects/my-app/
    # edit .devcontainer/devcontainer.json → "name": "my-app"
    ```
-   - Extra tools needed? Add them to `.devcontainer/Dockerfile`.
-   - Nothing extra? Delete that `Dockerfile` and in `devcontainer.json` replace
-     `"build": { "dockerfile": "Dockerfile" }` with `"image": "claude-base"`.
+   - By default the project uses `claude-base` as is — nothing else to do.
+   - Project needs extra tools (Python, compilers, ...)? Add them to `.devcontainer/Dockerfile`,
+     then in `devcontainer.json` comment out **Option A** and uncomment **Option B**.
 3. Load your GitHub key, then **start VS Code from that same terminal** (it forwards the agent it started with):
    ```bash
    cd ~/projects/my-app
@@ -128,7 +133,7 @@ Inside the container terminal:
 
 | Check | Command | Expected |
 |---|---|---|
-| Right folder | `pwd` | `/workspace` |
+| Right folder | `pwd` | `/workspace/<project-folder-name>` |
 | Claude installed | `claude --version` | a version number |
 | Safe settings | `cat /etc/claude-code/managed-settings.json` | the settings file |
 | GitHub access | `ssh -T git@github.com` | `Hi <you>!` |
@@ -141,9 +146,14 @@ Inside the container terminal:
 |---|---|
 | Install a package once | `sudo apt install <pkg>` — gone when the container is removed |
 | Install for every project | Add to `base/Dockerfile`, then `docker build -t claude-base base/` |
-| Install for one project | Add to that project's `.devcontainer/Dockerfile`, then F1 → *Rebuild Container* |
+| Install for one project | Add to `.devcontainer/Dockerfile`, enable Option B in `devcontainer.json`, then F1 → *Rebuild Container* |
+| Continue an earlier session | `/resume` inside Claude (sessions are kept per project folder name) |
 | Update Claude Code | `docker build --no-cache -t claude-base base/`, then rebuild project containers |
 | Log out / reset everything | `docker volume rm claude-home` |
+
+**Why `/workspace/<folder-name>`?** Claude files saved sessions by folder path. If every
+project were mounted at plain `/workspace`, `/resume` would mix sessions from all projects.
+Two projects with the same folder name still share sessions — rename one if that happens.
 
 ## Security notes
 

@@ -1,8 +1,14 @@
 {
   "name": "my-project",
-  "build": { "dockerfile": "Dockerfile" },
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
-  "workspaceFolder": "/workspace",
+
+  // Pick ONE of the two options below (comment out the other):
+  // Option A (default): use the base image as is
+  "image": "claude-base",
+  // Option B: build ./Dockerfile (base + extra tools for this project)
+  // "build": { "dockerfile": "Dockerfile" },
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "mounts": ["source=claude-home,target=/home/node,type=volume"],
   "remoteUser": "node",
   "customizations": {

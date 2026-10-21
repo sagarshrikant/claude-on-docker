@@ -2,6 +2,8 @@
 # Run Claude Code in a throw-away container for the current folder.
 # Usage:  cd ~/projects/my-app && /path/to/claude.sh [claude args]
 IMAGE="${CLAUDE_IMAGE:-claude-base}"
+# Mount at /workspace/<folder-name> so each project keeps its own Claude sessions (/resume)
+WS="/workspace/$(basename "$PWD")"
 
 SSH_ARGS=()
 if [ -n "$SSH_AUTH_SOCK" ]; then
@@ -11,8 +13,8 @@ else
 fi
 
 docker run -it --rm \
-  -v "$PWD":/workspace \
-  -w /workspace \
+  -v "$PWD":"$WS" \
+  -w "$WS" \
   -v claude-home:/home/node \
   "${SSH_ARGS[@]}" \
   "$IMAGE" claude "$@"
