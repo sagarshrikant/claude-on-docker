@@ -1,0 +1,5 @@
+# Never commit secrets
+.env
+*.key
+id_*
+!id_*.pub

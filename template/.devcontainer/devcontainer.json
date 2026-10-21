@@ -1,0 +1,11 @@
+{
+  "name": "my-project",
+  "build": { "dockerfile": "Dockerfile" },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspace",
+  "mounts": ["source=claude-home,target=/home/node,type=volume"],
+  "remoteUser": "node",
+  "customizations": {
+    "vscode": { "extensions": ["anthropic.claude-code"] }
+  }
+}
